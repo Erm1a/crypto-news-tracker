@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto News Tracker</title>
+    <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
+    <link href="/static/css/loader.css" rel="stylesheet">
+    <link href="/static/css/styles.css" rel="stylesheet">
+</head>
+<body>
+    <div class="flex h-screen">
+        <!-- Sidebar Toggle Button -->
+        <button id="sidebarToggle" class="sidebar-toggle" aria-label="Toggle sidebar">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+        </button>
+
+        <!-- Sidebar -->
+        <div class="sidebar w-80 p-6 fixed h-full overflow-y-auto">
+            <h1 class="text-2xl font-bold mb-8 gradient-text">Crypto News</h1>
+            
+            <!-- Price Display Section -->
+            <div class="mb-8 p-4 rounded-lg bg-white bg-opacity-5 border border-gray-700">
+                <div class="text-sm text-gray-400 mb-4" id="priceTimestamp"></div>
+                <div id="priceDisplay" class="space-y-3">
+                    <!-- Price items will be inserted here -->
+                </div>
+            </div>
+            
+            <div class="space-y-6 pb-20">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Coin</label>
+                    <select id="coinFilter" class="w-full p-2 rounded bg-black border border-gray-800 text-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                        <option value="">All Coins</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Search</label>
+                    <input type="text" id="searchFilter" class="w-full p-2 rounded bg-black border border-gray-800 text-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" placeholder="Search in title or content...">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">From Date</label>
+                    <input type="text" id="dateFrom" class="w-full p-2 rounded bg-black border border-gray-800 text-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 datepicker">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">To Date</label>
+                    <input type="text" id="dateTo" class="w-full p-2 rounded bg-black border border-gray-800 text-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 datepicker">
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content flex-1 p-12">
+            <div id="newsGrid" class="space-y-4 max-w-4xl mx-auto">
+                <!-- News cards will be inserted here -->
+            </div>
+            <div id="loading" class="flex justify-center items-center py-8 flex-col space-y-4">
+                <div class="loader-container">
+                    <img src="/static/css/img/bitcoin.svg" alt="Bitcoin" class="loader-icon coin-anim-1">
+                    <img src="/static/css/img/ethereum.svg" alt="Ethereum" class="loader-icon coin-anim-2">
+                    <img src="/static/css/img/dogecoin.svg" alt="Dogecoin" class="loader-icon coin-anim-3">
+                </div>
+                <p class="text-gray-400">Loading more news...</p>
+            </div>
+            <div id="pagination" class="flex justify-center mt-8 space-x-4 hidden"></div>
+        </div>
+
+        <!-- Theme Toggle Button -->
+        <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
+            <!-- Sun icon -->
+            <svg class="sun-icon hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+            <!-- Moon icon -->
+            <svg class="moon-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+        </button>
+    </div>
+
+    <!-- News Card Template -->
+    <template id="newsCardTemplate">
+        <div class="news-card rounded-lg cursor-pointer">
+            <div class="p-6">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="flex items-center space-x-3">
+                        <h2 class="text-lg font-medium text-gray-200"></h2>
+                    </div>
+                    <div class="text-sm text-gray-500 flex flex-col items-end">
+                        <span class="date"></span>
+                        <span class="time text-xs"></span>
+                    </div>
+                </div>
+                <p class="text-gray-400 mb-4 text-sm"></p>
+                <div class="coin-tags flex flex-wrap gap-2 mb-4"></div>
+                <div class="mt-4 flex justify-between items-center">
+                    <span class="text-sm text-gray-500"></span>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Modal for full article -->
+    <div id="newsModal" class="fixed inset-0 z-50 flex items-center justify-center hidden modal-overlay" tabindex="-1" aria-modal="true" role="dialog">
+        <div class="modal-content" style="z-index:60;">
+            <button id="closeModal" class="absolute top-4 right-4 hover:text-gray-700 text-2xl" aria-label="Close modal">&times;</button>
+            <h2 id="modalTitle" class="text-xl font-bold mb-4 pr-8"></h2>
+            <div class="text-sm mb-6" id="modalMeta"></div>
+            <div id="modalContent" class="overflow-y-auto flex-1 text-base"></div>
+            <div class="mt-6 flex justify-end">
+                <a id="modalExternalLink" href="#" target="_blank" rel="noopener noreferrer" class="text-sm font-medium">View Original Article ↗</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script>
+        // Sidebar toggle functionality
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const sidebar = document.querySelector('.sidebar');
+        const mainContent = document.querySelector('.main-content');
+        
+        sidebarToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('collapsed');
+            mainContent.classList.toggle('expanded');
+            sidebarToggle.classList.toggle('collapsed-button');
+            
+            // Update toggle button icon
+            const svg = sidebarToggle.querySelector('svg');
+            if (sidebar.classList.contains('collapsed')) {
+                svg.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />';
+            } else {
+                svg.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />';
+            }
+        });
+
+        // Theme handling
+        const themeToggle = document.getElementById('themeToggle');
+        const sunIcon = themeToggle.querySelector('.sun-icon');
+        const moonIcon = themeToggle.querySelector('.moon-icon');
+        
+        // Check for saved theme preference
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        updateThemeIcons(savedTheme);
+
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeIcons(newTheme);
+        });
+
+        function updateThemeIcons(theme) {
+            if (theme === 'dark') {
+                sunIcon.classList.remove('hidden');
+                moonIcon.classList.add('hidden');
+            } else {
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+            }
+        }
+
+        // Initialize date pickers with dark theme
+        flatpickr(".datepicker", {
+            enableTime: true,
+            dateFormat: "Y-m-d H:i",
+            theme: "dark"
+        });
+
+        // Load coins for filter
+        fetch('/api/coins')
+            .then(response => response.json())
+            .then(coins => {
+                const select = document.getElementById('coinFilter');
+                coins.forEach(coin => {
+                    const option = document.createElement('option');
+                    option.value = coin;
+                    option.textContent = coin.toUpperCase();
+                    select.appendChild(option);
+                });
+            });
+
+        // Function to format date
+        function formatDate(dateString) {
+            return new Date(dateString).toLocaleString();
+        }
+
+        // Function to format price
+        function formatPrice(price) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD'
+            }).format(price);
+        }
+
+        // Function to load news
+        let currentOffset = 0;
+        const limit = 20; // Increased from 10 to 20 for better performance
+        let isLoading = false;
+        let hasMore = true;
+        let newsCache = new Map(); // Cache for news items
+
+        function loadNews() {
+            if (isLoading || !hasMore) return;
+
+            isLoading = true;
+            document.getElementById('loading').classList.remove('hidden');
+
+            const coin = document.getElementById('coinFilter').value;
+            const search = document.getElementById('searchFilter').value;
+            const dateFrom = document.getElementById('dateFrom').value;
+            const dateTo = document.getElementById('dateTo').value;
+
+            // Create cache key
+            const cacheKey = `${coin}-${search}-${dateFrom}-${dateTo}-${currentOffset}`;
+            
+            // Check cache first
+            if (newsCache.has(cacheKey)) {
+                const cachedNews = newsCache.get(cacheKey);
+                displayNews(cachedNews);
+                isLoading = false;
+                return;
+            }
+
+            const params = new URLSearchParams();
+            if (coin) params.append('coin', coin);
+            if (search) params.append('search', search);
+            if (dateFrom) params.append('date_from', dateFrom);
+            if (dateTo) params.append('date_to', dateTo);
+            params.append('limit', limit);
+            params.append('offset', currentOffset);
+
+            fetch(`/api/news?${params.toString()}`)
+                .then(response => response.json())
+                .then(news => {
+                    if (news.length === 0) {
+                        hasMore = false;
+                        document.getElementById('loading').classList.add('hidden');
+                        return;
+                    }
+
+                    // Cache the results
+                    newsCache.set(cacheKey, news);
+                    
+                    // Display the news
+                    displayNews(news);
+                    
+                    currentOffset += news.length;
+                    hasMore = news.length === limit;
+                })
+                .catch(error => {
+                    console.error('Error loading news:', error);
+                             document.getElementById('loading').classList.add('hidden');
+                })
+                .finally(() => {
+                    isLoading = false;
+                });
+        }
+
+        function displayNews(news) {
+            const grid = document.getElementById('newsGrid');
+            const template = document.getElementById('newsCardTemplate');
+            
+                        news.forEach(item => {
+                            const card = template.content.cloneNode(true);
+                            card.querySelector('h2').textContent = item.title;
+                
+                // Optimize content preview
+                const preview = item.content ? 
+                    item.content.slice(0, 200) + (item.content.length > 200 ? '...' : '') : '';
+                            card.querySelector('p').textContent = preview;
+                            
+                // Format date once
+                            const dateTime = new Date(item.published_date);
+                            card.querySelector('.date').textContent = dateTime.toLocaleDateString();
+                            card.querySelector('.time').textContent = dateTime.toLocaleTimeString();
+
+                            // Add coin tags with hover prices
+                            const tagsDiv = card.querySelector('.coin-tags');
+                            if (item.coins && item.coins.length > 0) {
+                    const fragment = document.createDocumentFragment();
+                                item.coins.forEach(coin => {
+                                    const price = item.prices[coin];
+                                    const tagDiv = document.createElement('div');
+                                    tagDiv.className = 'coin-tag';
+                                    tagDiv.innerHTML = `
+                                        <span class="bg-gray-800 text-gray-300 px-2 py-1 rounded text-xs font-medium">
+                                            ${coin.toUpperCase()}
+                                        </span>
+                                        <div class="price-tooltip">
+                                            <div><b>At news time:</b> ${price.historical && price.historical.price ? formatPrice(price.historical.price) : 'N/A'}</div>
+                                            <div><b>Current:</b> ${price.current && price.current.price ? formatPrice(price.current.price) : 'N/A'}</div>
+                                        </div>
+                                    `;
+                        fragment.appendChild(tagDiv);
+                                });
+                    tagsDiv.appendChild(fragment);
+                            } else {
+                                tagsDiv.innerHTML = '<span class="text-gray-500 text-xs">No cryptocurrency mentions</span>';
+                            }
+
+                            // Make the whole card clickable
+                            const newsCard = card.querySelector('.news-card');
+                            newsCard.addEventListener('click', (e) => {
+                    if (!e.target.closest('a')) {
+                                openModal(item);
+                    }
+                });
+
+                grid.appendChild(card);
+            });
+        }
+
+        // Price display functionality with caching
+        let priceCache = null;
+        let lastPriceUpdate = 0;
+        const PRICE_CACHE_DURATION = 30000; // 30 seconds
+
+        function updatePriceDisplay() {
+            const priceDisplay = document.getElementById('priceDisplay');
+            const priceTimestamp = document.getElementById('priceTimestamp');
+            
+            // Update timestamp
+            const now = new Date();
+            priceTimestamp.textContent = now.toLocaleString();
+
+            // Check cache
+            if (priceCache && (now - lastPriceUpdate) < PRICE_CACHE_DURATION) {
+                displayPrices(priceCache);
+                return;
+            }
+            
+            // Show loading state
+            priceDisplay.innerHTML = `
+                <div class="flex items-center justify-center space-x-2">
+                    <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                    <span class="text-sm text-gray-400">Loading prices...</span>
+                </div>
+            `;
+            
+                fetch('/api/prices')
+                .then(response => response.json())
+                    .then(prices => {
+                        if (!prices || prices.length === 0) {
+                        priceDisplay.innerHTML = `
+                            <div class="text-sm text-yellow-500 p-2">
+                                <p>No price data available</p>
+                                <p class="text-xs mt-1">Please try again in a few moments.</p>
+                            </div>
+                        `;
+                            return;
+                        }
+                        
+                    // Update cache
+                    priceCache = prices;
+                    lastPriceUpdate = now.getTime();
+                    
+                    displayPrices(prices);
+                })
+                .catch(error => {
+                    console.error('Error fetching prices:', error);
+                    priceDisplay.innerHTML = `
+                        <div class="text-sm text-red-500 p-2">
+                            <p>Error loading prices.</p>
+                            <p class="text-xs mt-1">Please try refreshing the page.</p>
+                            <button onclick="updatePriceDisplay()" class="mt-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">
+                                Retry
+                            </button>
+                        </div>
+                    `;
+                });
+        }
+
+        function displayPrices(prices) {
+            const priceDisplay = document.getElementById('priceDisplay');
+            const fragment = document.createDocumentFragment();
+            
+            prices.forEach(([coin, price]) => {
+                if (price === null || price === undefined) return;
+                            
+                            const priceItem = document.createElement('div');
+                priceItem.className = 'price-item flex items-center justify-between p-2 hover:bg-gray-800 rounded transition-colors';
+                            priceItem.innerHTML = `
+                                <div class="flex items-center space-x-2">
+                                    <img src="/static/css/img/${coin.toLowerCase()}.svg" alt="${coin}" class="w-6 h-6">
+                                    <span class="text-sm font-medium">${coin.toUpperCase()}</span>
+                                </div>
+                                <span class="text-sm">${formatPrice(price)}</span>
+                            `;
+                fragment.appendChild(priceItem);
+            });
+            
+            priceDisplay.innerHTML = '';
+            priceDisplay.appendChild(fragment);
+        }
+
+        // Initialize
+        loadNews();
+        updatePriceDisplay();
+        
+        // Update prices every 30 seconds
+        setInterval(updatePriceDisplay, 30000);
+
+        // Modal logic
+        function openModal(item) {
+            const modal = document.getElementById('newsModal');
+            const modalContent = modal.querySelector('.modal-content');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalMeta = document.getElementById('modalMeta');
+            const modalContentDiv = document.getElementById('modalContent');
+            const modalExternalLink = document.getElementById('modalExternalLink');
+            const sidebarToggle = document.getElementById('sidebarToggle');
+            const themeToggle = document.getElementById('themeToggle');
+
+            modalTitle.textContent = item.title;
+            modalMeta.textContent = `${formatDate(item.published_date)}${item.source ? ' • ' + item.source : ''}`;
+            modalContentDiv.innerHTML = item.content ? item.content.replace(/\n/g, '<br>') : '';
+            modalExternalLink.href = item.url;
+
+            modal.classList.remove('hidden');
+            // Trigger reflow
+            modal.offsetHeight;
+            modal.classList.add('active');
+            modalContent.classList.add('active');
+
+            // Hide sidebar and theme toggles
+            // sidebarToggle.classList.add('hidden');
+            // themeToggle.classList.add('hidden');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('newsModal');
+            const modalContent = modal.querySelector('.modal-content');
+            const sidebarToggle = document.getElementById('sidebarToggle');
+            const themeToggle = document.getElementById('themeToggle');
+            
+            modal.classList.remove('active');
+            modalContent.classList.remove('active');
+            
+            // Wait for animation to complete before hiding modal and showing buttons
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                // Show sidebar and theme toggles after modal is hidden
+                // sidebarToggle.classList.remove('hidden');
+                // themeToggle.classList.remove('hidden');
+            }, 300);
+        }
+
+        // Update event listeners
+        document.getElementById('closeModal').addEventListener('click', closeModal);
+        document.getElementById('newsModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,388 @@
+/* Custom Scrollbar Styles for Webkit Browsers */
+::-webkit-scrollbar {
+    width: 8px; /* thinner scrollbar */
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-secondary); /* Match background */
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #4a5568; /* Darker gray for thumb */
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #3b82f6; /* Blue on hover */
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+    background: #a0aec0; /* Lighter gray for thumb in light mode */
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+    background: #3b82f6; /* Blue on hover in light mode */
+}
+
+:root {
+    --bg-primary: #0a0a0a;
+    --bg-secondary: #111111;
+    --border-color: #222222;
+    --text-primary: #ffffff;
+    --text-secondary: #a0aec0;
+}
+
+[data-theme="light"] {
+    --bg-primary: #f8f8f8; /* Changed from #f7fafc to a slightly off-white */
+    --bg-secondary: #ffffff;
+    --border-color: #cbd5e1;
+    --text-primary: #1a202c;
+    --text-secondary: #4a5568;
+}
+
+body {
+    background: var(--bg-primary);
+    min-height: 100vh;
+    color: var(--text-primary);
+    transition: background-color 0.3s ease;
+}
+
+.sidebar {
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border-color);
+    color: var(--text-primary);
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.news-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    transition: all 0.2s ease;
+}
+
+.news-card:hover {
+    border-color: #3b82f6;
+    transform: translateY(-2px);
+    z-index: 20; /* Ensure hovered card is above others */
+}
+
+.coin-tag {
+    position: relative;
+    display: inline-block;
+}
+
+.coin-tag:hover .price-tooltip {
+    display: block;
+}
+
+.price-tooltip {
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 14px;
+    white-space: nowrap;
+    z-index: 100;
+    margin-bottom: 5px;
+    border: 1px solid var(--border-color);
+}
+
+.price-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 5px;
+    border-style: solid;
+    border-color: var(--bg-secondary) transparent transparent transparent;
+}
+
+.gradient-text {
+    background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.loading-spinner {
+    border-color: #3b82f6;
+}
+
+.theme-toggle {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 100;
+}
+
+.theme-toggle:hover {
+    transform: scale(1.1);
+}
+
+.theme-toggle svg {
+    width: 20px;
+    height: 20px;
+    color: var(--text-primary);
+    transition: transform 0.3s ease;
+}
+
+.theme-toggle:hover svg {
+    transform: rotate(30deg);
+}
+
+.coin-tag span {
+    background: #222a36;
+    color: #e2e8f0;
+}
+
+[data-theme="light"] .coin-tag span {
+    background: #e2e8f0;
+    color: #1a202c;
+}
+
+input, select {
+    background: #18181b;
+    color: #f1f5f9;
+    border: 1px solid #222a36;
+}
+
+[data-theme="light"] input, [data-theme="light"] select {
+    background: #ffffff;
+    color: #1a202c;
+    border: 1px solid #cbd5e1;
+}
+
+.news-card h2 {
+    color: var(--text-primary);
+}
+
+[data-theme="light"] .news-card h2 {
+    color: #1a202c;
+    font-weight: 700;
+}
+
+/* Coin loader animation */
+@keyframes fadeInOut {
+    0%, 100% { opacity: 0; transform: translateY(-10px); }
+    50% { opacity: 1; transform: translateY(0); }
+}
+
+.coin-anim-1 { animation: fadeInOut 2s infinite ease-in-out; }
+.coin-anim-2 { animation: fadeInOut 2s infinite ease-in-out 0.5s; /* 0.5s delay */ }
+.coin-anim-3 { animation: fadeInOut 2s infinite ease-in-out 1s; /* 1s delay */ }
+
+/* Loader icon theming */
+.loader-icon {
+    filter: grayscale(100%) invert(1); /* Grayscale and then invert for light color in dark mode */
+}
+
+[data-theme="light"] .loader-icon {
+    filter: grayscale(100%) invert(0); /* Grayscale and then no invert for original (dark) color in light mode */
+}
+
+/* Modal Animation Styles */
+.modal-overlay {
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(5px); /* Add blur effect */
+    -webkit-backdrop-filter: blur(5px); /* Safari support */
+}
+
+.modal-overlay.active {
+    opacity: 1;
+}
+
+.modal-content {
+    transform: scale(0.95);
+    opacity: 0;
+    transition: all 0.3s ease-in-out;
+    max-width: 600px; /* Increased width */
+    width: 90%;
+    padding: 2rem;
+    border-radius: 1rem;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    max-height: 90vh;
+}
+
+.modal-content.active {
+    transform: scale(1);
+    opacity: 1;
+}
+
+#modalTitle {
+    font-size: 1.25rem;
+    line-height: 1.5;
+    margin-bottom: 1rem;
+    padding-right: 2rem;
+    color: var(--text-primary);
+}
+
+#modalMeta {
+    margin-bottom: 1.5rem;
+    color: var(--text-secondary);
+}
+
+#modalContent {
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+    min-height: 0;
+    padding: 1.5rem;
+    padding-right: 2rem;
+    color: var(--text-primary);
+    /* Custom scrollbar styles for modal content */
+    overflow-y: auto;
+    max-height: 60vh;
+}
+
+/* Custom scrollbar for modal content */
+#modalContent::-webkit-scrollbar {
+    width: 6px;
+}
+
+#modalContent::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 1rem 0;
+}
+
+#modalContent::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+    transition: background 0.2s ease;
+}
+
+#modalContent::-webkit-scrollbar-thumb:hover {
+    background: #3b82f6;
+}
+
+[data-theme="light"] #modalContent::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+}
+
+[data-theme="light"] #modalContent::-webkit-scrollbar-thumb:hover {
+    background: #3b82f6;
+}
+
+#modalExternalLink {
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+    color: #3b82f6;
+}
+
+#modalExternalLink:hover {
+    background-color: rgba(59, 130, 246, 0.1);
+}
+
+#closeModal {
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+    color: var(--text-primary);
+}
+
+#closeModal:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] #closeModal:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Sidebar Toggle Button Styles */
+.sidebar-toggle {
+    position: fixed;
+    top: 20px;
+    left: 20px; /* Default position: left when collapsed */
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 40; /* Lowered z-index to be behind modal */
+    transition: all 0.3s ease, left 0.3s ease; /* Ensure 'left' transitions smoothly */
+}
+
+.sidebar-toggle:hover {
+    transform: scale(1.1);
+}
+
+.sidebar-toggle svg {
+    width: 20px;
+    height: 20px;
+    color: var(--text-primary);
+    transition: transform 0.3s ease; /* Keep existing icon transition */
+}
+
+/* When sidebar is not collapsed, move button to the right of the sidebar */
+.sidebar-toggle:not(.collapsed-button) {
+    left: 260px; /* (320px sidebar width - 40px button width - 20px desired right margin) */
+}
+
+/* Sidebar Collapse Styles */
+.sidebar {
+    transition: transform 0.3s ease, width 0.3s ease;
+    transform: translateX(0);
+    width: 320px;
+}
+
+.sidebar.collapsed {
+    transform: translateX(-100%);
+    width: 0;
+}
+
+.main-content {
+    transition: margin-left 0.3s ease;
+    margin-left: 320px;
+}
+
+.main-content.expanded {
+    margin-left: 0;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Price display section styles */
+#priceDisplay img {
+    filter: brightness(0) invert(1); /* Make SVG white in dark mode */
+    transition: filter 0.3s ease;
+}
+
+[data-theme="light"] #priceDisplay img {
+    filter: brightness(0) invert(0); /* Make SVG black in light mode */
+}
+
+#priceDisplay .price-item {
+    transition: all 0.3s ease;
+}
+
+#priceDisplay .price-item:hover {
+    transform: translateX(5px);
+    background: none !important;
+} 
