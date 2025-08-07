@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 import re
 from functools import lru_cache
 import threading
+import random
 
 # Load environment variables
 load_dotenv(override=True)
@@ -257,39 +258,69 @@ class CryptoNewsTracker:
             raise
 
     def get_historical_price(self, coin_id: str, timestamp: datetime) -> float:
-        """Fetch historical price from Messari for a specific timestamp"""
+        """Fetch historical price from CoinGecko for a specific timestamp with fallback"""
         try:
-            # Convert to Messari ID
-            messari_id = COIN_SYMBOL_MAP.get(coin_id)
-            if not messari_id:
-                raise ValueError(f"No Messari ID mapping found for {coin_id}")
-
-            # Format timestamp for Messari API
-            date_str = timestamp.strftime("%Y-%m-%d")
+            # Add random delay to avoid rate limiting (0.5 to 2 seconds)
+            time.sleep(random.uniform(0.5, 2.0))
             
-            # Get historical price data from Messari
-            url = f"{MESSARI_API_URL}/assets/{messari_id}/metrics/price/time-series"
+            # Convert timestamp to Unix timestamp (seconds)
+            unix_timestamp = int(timestamp.timestamp())
+            
+            # Use CoinGecko's historical data endpoint
+            url = f"{COINGECKO_API_URL}/coins/{coin_id}/market_chart/range"
             params = {
-                "start": date_str,
-                "end": date_str,
-                "interval": "1d"
+                "vs_currency": "usd",
+                "from": unix_timestamp,
+                "to": unix_timestamp + 86400  # Add 24 hours to get the day's data
             }
-            headers = {'x-messari-api-key': MESSARI_API_KEY} if MESSARI_API_KEY else {}
             
-            response = requests.get(url, params=params, headers=headers)
+            response = requests.get(url, params=params, timeout=15)
             response.raise_for_status()
             data = response.json()
             
-            if 'data' in data and 'values' in data['data'] and data['data']['values']:
-                # Get the closing price for the day
-                price_data = data['data']['values'][0]
-                return price_data[1]  # Messari returns [timestamp, price] pairs
+            # Check for rate limit or API errors
+            if 'status' in data and 'error_code' in data['status']:
+                error_code = data['status']['error_code']
+                if error_code == 429:  # Rate limit
+                    print(f"CoinGecko rate limit hit for {coin_id}, skipping historical price")
+                    return None
+                else:
+                    print(f"CoinGecko API error for {coin_id}: {data['status']}")
+                    return None
+            
+            if 'prices' in data and data['prices']:
+                # Get the price closest to the timestamp
+                # CoinGecko returns [timestamp, price] pairs
+                prices = data['prices']
+                
+                # Find the price closest to our target timestamp
+                closest_price = None
+                min_diff = float('inf')
+                
+                for price_entry in prices:
+                    entry_timestamp = price_entry[0] / 1000  # Convert from milliseconds
+                    diff = abs(entry_timestamp - unix_timestamp)
+                    
+                    if diff < min_diff:
+                        min_diff = diff
+                        closest_price = price_entry[1]
+                
+                if closest_price is not None and closest_price > 0:
+                    print(f"Successfully got historical price for {coin_id}: ${closest_price}")
+                    return closest_price
+                else:
+                    print(f"No valid historical price data found for {coin_id} at {timestamp}")
+                    return None
             else:
-                raise ValueError(f"No historical price data found for {coin_id} at {timestamp}")
+                print(f"No historical price data found for {coin_id} at {timestamp}")
+                return None
                 
         except requests.exceptions.RequestException as e:
-            print(f"Error fetching historical price from Messari: {e}")
-            raise
+            print(f"Error fetching historical price from CoinGecko for {coin_id}: {e}")
+            return None
+        except Exception as e:
+            print(f"Unexpected error fetching historical price for {coin_id}: {e}")
+            return None
 
     def store_news(self, article: Dict, mentioned_coins: Set[str]):
         """Store news article and related coin data in database"""
@@ -330,16 +361,17 @@ class CryptoNewsTracker:
                 return news_id
 
             print("Inserting new article into database")
-            # Insert new news article
+            # Insert new news article with pending status
             self.cursor.execute("""
-                INSERT INTO crypto_news (title, content, published_date, source, url)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO crypto_news (title, content, published_date, source, url, processing_status)
+                VALUES (%s, %s, %s, %s, %s, 'pending')
                 RETURNING id
             """, (title, body, published_date, source, url))
             news_id = self.cursor.fetchone()[0]
             print(f"Stored new news article with ID: {news_id}")
 
             # Store prices and create news-coin relationships
+            processing_successful = True
             for coin_id in mentioned_coins:
                 print(f"Processing coin: {coin_id}")
                 try:
@@ -364,13 +396,32 @@ class CryptoNewsTracker:
                     ))
 
                     # Create news-coin relationship with historical price at news time
-                    print(f"Creating news-coin relationship for {coin_id}")
+                    # Use current price as fallback if historical price is not available
+                    price_to_store = historical_price if historical_price is not None and historical_price > 0 else current_price_data["usd"]
+                    print(f"Creating news-coin relationship for {coin_id} with price: {price_to_store}")
                     self.cursor.execute("""
                         INSERT INTO news_coins (news_id, coin_id, price_at_news)
                         VALUES (%s, %s, %s)
-                    """, (news_id, coin_id, historical_price))
+                    """, (news_id, coin_id, price_to_store))
                 except Exception as e:
                     print(f"Error processing coin {coin_id}: {e}")
+                    processing_successful = False
+
+            # Update processing status based on success
+            if processing_successful:
+                self.cursor.execute("""
+                    UPDATE crypto_news 
+                    SET processing_status = 'completed' 
+                    WHERE id = %s
+                """, (news_id,))
+                print("✅ Article processing completed successfully")
+            else:
+                self.cursor.execute("""
+                    UPDATE crypto_news 
+                    SET processing_status = 'failed' 
+                    WHERE id = %s
+                """, (news_id,))
+                print("⚠️ Article processing completed with some errors")
 
             self.conn.commit()
             print("Successfully committed all data to database")
@@ -502,7 +553,8 @@ def create_tables():
                 content TEXT,
                 published_date TIMESTAMP NOT NULL,
                 source TEXT,
-                url TEXT UNIQUE NOT NULL
+                url TEXT UNIQUE NOT NULL,
+                processing_status TEXT DEFAULT 'pending'
             );
         """)
         
@@ -558,13 +610,13 @@ def get_news():
     offset = int(request.args.get('offset', 0))
     
     # Build query to get news and at-news-time prices
-    # Using a CTE to first get the filtered news items
+    # Using a CTE to first get the filtered news items (only completed posts)
     query = """
         WITH filtered_news AS (
             SELECT n.id, n.title, n.content, n.published_date, n.source, n.url
             FROM crypto_news n
             LEFT JOIN news_coins nc ON n.id = nc.news_id
-            WHERE 1=1
+            WHERE n.processing_status = 'completed'
     """
     params = []
     
@@ -644,6 +696,48 @@ def get_news():
 def get_coins():
     # Return all tracked coins directly from TRACKED_COINS
     return jsonify(list(TRACKED_COINS.keys()))
+
+@app.route('/api/processing-status')
+def get_processing_status():
+    """Get the processing status of recent posts"""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Get processing status counts
+        cur.execute("""
+            SELECT processing_status, COUNT(*) 
+            FROM crypto_news 
+            GROUP BY processing_status
+        """)
+        
+        status_counts = dict(cur.fetchall())
+        
+        # Get recent pending posts
+        cur.execute("""
+            SELECT id, title, published_date 
+            FROM crypto_news 
+            WHERE processing_status = 'pending'
+            ORDER BY published_date DESC 
+            LIMIT 5
+        """)
+        
+        pending_posts = [
+            {"id": row[0], "title": row[1], "published_date": row[2].isoformat()}
+            for row in cur.fetchall()
+        ]
+        
+        return jsonify({
+            "status_counts": status_counts,
+            "pending_posts": pending_posts
+        })
+        
+    except Exception as e:
+        print(f"Error getting processing status: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 @app.route('/api/prices')
 def get_prices():
@@ -780,14 +874,21 @@ def reprocess_post(post_id: int):
                 historical_price = tracker.get_historical_price(coin_id, post[3])
                 print(f"Got historical price for {coin_id} at {post[3]}: {historical_price}")
                 
-                # Insert new relationship with historical price
+                # Get current price as fallback
+                current_price_data = tracker.get_coin_price(coin_id)
+                current_price = current_price_data["usd"] if current_price_data else None
+                
+                # Use historical price if available, otherwise use current price
+                price_to_store = historical_price if historical_price is not None and historical_price > 0 else current_price
+                
+                # Insert new relationship with price
                 cur.execute("""
                     INSERT INTO news_coins (news_id, coin_id, price_at_news)
                     VALUES (%s, %s, %s)
-                """, (post_id, coin_id, historical_price))
+                """, (post_id, coin_id, price_to_store))
             except Exception as e:
                 print(f"Error processing coin {coin_id}: {e}")
-                # Insert the coin relationship even if historical price fetch fails
+                # Insert the coin relationship even if price fetch fails
                 cur.execute("""
                     INSERT INTO news_coins (news_id, coin_id, price_at_news)
                     VALUES (%s, %s, NULL)

@@ -23,6 +23,14 @@
         <div class="sidebar w-80 p-6 fixed h-full overflow-y-auto">
             <h1 class="text-2xl font-bold mb-8 gradient-text">Crypto News</h1>
             
+            <!-- Processing Status Indicator -->
+            <div id="processingStatus" class="mb-4 p-3 rounded-lg bg-blue-900 bg-opacity-20 border border-blue-700 hidden">
+                <div class="flex items-center space-x-2">
+                    <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                    <span class="text-sm text-blue-400">Processing new articles...</span>
+                </div>
+            </div>
+            
             <!-- Price Display Section -->
             <div class="mb-8 p-4 rounded-lg bg-white bg-opacity-5 border border-gray-700">
                 <div class="text-sm text-gray-400 mb-4" id="priceTimestamp"></div>
@@ -82,27 +90,33 @@
         </button>
     </div>
 
-    <!-- News Card Template -->
-    <template id="newsCardTemplate">
-        <div class="news-card rounded-lg cursor-pointer">
-            <div class="p-6">
-                <div class="flex justify-between items-start mb-4">
-                    <div class="flex items-center space-x-3">
-                        <h2 class="text-lg font-medium text-gray-200"></h2>
+            <!-- News Card Template -->
+        <template id="newsCardTemplate">
+            <div class="news-card rounded-lg cursor-pointer">
+                <div class="p-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="flex items-center space-x-3">
+                            <h2 class="text-lg font-medium text-gray-200"></h2>
+                            <div class="processing-indicator hidden">
+                                <div class="flex items-center space-x-2">
+                                    <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                                    <span class="text-xs text-blue-500">Processing...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-sm text-gray-500 flex flex-col items-end">
+                            <span class="date"></span>
+                            <span class="time text-xs"></span>
+                        </div>
                     </div>
-                    <div class="text-sm text-gray-500 flex flex-col items-end">
-                        <span class="date"></span>
-                        <span class="time text-xs"></span>
+                    <p class="text-gray-400 mb-4 text-sm"></p>
+                    <div class="coin-tags flex flex-wrap gap-2 mb-4"></div>
+                    <div class="mt-4 flex justify-between items-center">
+                        <span class="text-sm text-gray-500"></span>
                     </div>
-                </div>
-                <p class="text-gray-400 mb-4 text-sm"></p>
-                <div class="coin-tags flex flex-wrap gap-2 mb-4"></div>
-                <div class="mt-4 flex justify-between items-center">
-                    <span class="text-sm text-gray-500"></span>
                 </div>
             </div>
-        </div>
-    </template>
+        </template>
 
     <!-- Modal for full article -->
     <div id="newsModal" class="fixed inset-0 z-50 flex items-center justify-center hidden modal-overlay" tabindex="-1" aria-modal="true" role="dialog">
@@ -189,7 +203,8 @@
 
         // Function to format date
         function formatDate(dateString) {
-            return new Date(dateString).toLocaleString();
+            const date = new Date(dateString);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         }
 
         // Function to format price
@@ -277,10 +292,10 @@
                     item.content.slice(0, 200) + (item.content.length > 200 ? '...' : '') : '';
                             card.querySelector('p').textContent = preview;
                             
-                // Format date once
-                            const dateTime = new Date(item.published_date);
-                            card.querySelector('.date').textContent = dateTime.toLocaleDateString();
-                            card.querySelector('.time').textContent = dateTime.toLocaleTimeString();
+                                // Format date once
+                const dateTime = new Date(item.published_date);
+                card.querySelector('.date').textContent = dateTime.toLocaleDateString();
+                card.querySelector('.time').textContent = dateTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
                             // Add coin tags with hover prices
                             const tagsDiv = card.querySelector('.coin-tags');
@@ -295,8 +310,9 @@
                                             ${coin.toUpperCase()}
                                         </span>
                                         <div class="price-tooltip">
-                                            <div><b>At news time:</b> ${price.historical && price.historical.price ? formatPrice(price.historical.price) : 'N/A'}</div>
-                                            <div><b>Current:</b> ${price.current && price.current.price ? formatPrice(price.current.price) : 'N/A'}</div>
+                                            <div><b>At news time:</b> ${price.historical && price.historical.price && price.historical.price > 0 ? formatPrice(price.historical.price) : 'N/A'}</div>
+                                            <div><b>Current:</b> ${price.current && price.current.price && price.current.price > 0 ? formatPrice(price.current.price) : 'N/A'}</div>
+                                            ${(!price.historical || !price.historical.price || price.historical.price <= 0) ? '<div class="text-xs text-yellow-500 mt-1">Using current price as fallback</div>' : ''}
                                         </div>
                                     `;
                         fragment.appendChild(tagDiv);
@@ -401,12 +417,35 @@
             priceDisplay.appendChild(fragment);
         }
 
+        // Function to check processing status
+        function checkProcessingStatus() {
+            fetch('/api/processing-status')
+                .then(response => response.json())
+                .then(data => {
+                    const processingStatus = document.getElementById('processingStatus');
+                    
+                    if (data.pending_posts && data.pending_posts.length > 0) {
+                        processingStatus.classList.remove('hidden');
+                        console.log(`Processing ${data.pending_posts.length} pending posts...`);
+                    } else {
+                        processingStatus.classList.add('hidden');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking processing status:', error);
+                });
+        }
+
         // Initialize
         loadNews();
         updatePriceDisplay();
+        checkProcessingStatus();
         
         // Update prices every 30 seconds
         setInterval(updatePriceDisplay, 30000);
+        
+        // Check processing status every 10 seconds
+        setInterval(checkProcessingStatus, 10000);
 
         // Modal logic
         function openModal(item) {
